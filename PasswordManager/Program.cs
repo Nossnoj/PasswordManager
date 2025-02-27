@@ -39,6 +39,7 @@ namespace PasswordManager
             string IVJson = JsonSerializer.Serialize(IV);
 
             File.WriteAllText(serverFile, "encryptedVault" + IVJson); //byteArray lagras encodad i base64string i serverfilen
+            
             Console.WriteLine("STOP");
         }
 
@@ -55,6 +56,11 @@ namespace PasswordManager
             return byteArray;
 
             //OVAN TAGET FRÅN https://learn.microsoft.com/mt-mt/dotnet/api/system.security.cryptography.randomnumbergenerator.getbytes?view=netcore-2.2
+        }
+
+        static void testMethodForGit()
+        {
+            Console.WriteLine("hej");
         }
     }
 }
