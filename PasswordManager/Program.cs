@@ -61,6 +61,7 @@ namespace PasswordManager
         static void testMethodForGit()
         {
             Console.WriteLine("hej");
+            Console.WriteLine("hejhej");
         }
     }
 }
