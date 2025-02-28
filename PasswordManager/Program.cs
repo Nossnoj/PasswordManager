@@ -14,7 +14,7 @@ namespace PasswordManager
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             string clientFile = Path.Combine(desktopPath, "client.json");
             string serverFile = Path.Combine(desktopPath, "server.json");
-
+            
 
 
 
@@ -64,6 +64,11 @@ namespace PasswordManager
         {
             Console.WriteLine("hej");
             Console.WriteLine("hejhej");
+        }
+
+        static void testLinusGit()
+        {
+            Console.WriteLine("hej ejskgt");
         }
     }
 }
