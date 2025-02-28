@@ -29,7 +29,7 @@ namespace PasswordManager
 
             File.WriteAllText(clientFile, dictJson);
 
-
+            
 
             //Vault ska vara ett dictionary
             //Server ska vara ett dictionary
@@ -68,8 +68,7 @@ namespace PasswordManager
 
         static void testLinusGit()
         {
-            Console.WriteLine("hej ejskgt");
-
+            Console.WriteLine("hej forntite");
         }
     }
 }
