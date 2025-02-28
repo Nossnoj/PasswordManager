@@ -83,7 +83,8 @@ namespace PasswordManager
 
         static void testMetodernasTestMetod(string enTestMetod)
         {
-            Console.WriteLine(enTestMetod);
+            Console.WriteLine("Kul med github");
         }
+
     }
 }
