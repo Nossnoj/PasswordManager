@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Xml;
 
 namespace PasswordManager
 {
@@ -64,6 +65,25 @@ namespace PasswordManager
         {
             Console.WriteLine("hej");
             Console.WriteLine("hejhej");
+        }
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+        static void testMetodernasTestMetod(string enTestMetod)
+        {
+            Console.WriteLine(enTestMetod);
         }
     }
 }
