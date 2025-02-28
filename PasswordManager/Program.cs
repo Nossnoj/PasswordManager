@@ -21,7 +21,7 @@ namespace PasswordManager
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             string clientFile = Path.Combine(desktopPath, "client.json");
             string serverFile = Path.Combine(desktopPath, "server.json");
-
+            
 
             //skapar clientFile på desktop med secret key
             byte[] secretKeyByteArray = GenerateByteArray(16); 
@@ -34,9 +34,7 @@ namespace PasswordManager
 
             File.WriteAllText(clientFile, dictJson);
 
-
-            //Fokusera på INIT-commandot vilket är kryptera och dekryptera 
-            // AES klass länkad i filerna
+            
 
             //Vault ska vara ett dictionary
             //Server ska vara ett dictionary
