@@ -69,6 +69,7 @@ namespace PasswordManager
         static void testLinusGit()
         {
             Console.WriteLine("hej ejskgt");
+
         }
     }
 }
