@@ -31,6 +31,8 @@ namespace PasswordManager
 
 
 
+            //Vault ska vara ett dictionary
+            //Server ska vara ett dictionary
 
 
 
