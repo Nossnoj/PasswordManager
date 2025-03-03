@@ -25,7 +25,7 @@ namespace PasswordManager
             {
                 byte[] encrypted = AESEncrypt(dataIn, vaultKey, myAes.IV);
 
-                string roundtrip = AESDecrypt(encrypted, myAes.Key, myAes.IV);
+                string roundtrip = AESDecrypt(encrypted, vaultKey, myAes.IV);
             }        
         }
 
