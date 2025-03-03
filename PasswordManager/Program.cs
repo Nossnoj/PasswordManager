@@ -34,7 +34,9 @@ namespace PasswordManager
 
             File.WriteAllText(clientFile, dictJson);
 
-            
+
+            //Fokusera på INIT-commandot vilket är kryptera och dekryptera 
+            // AES klass länkad i filerna
 
             //Vault ska vara ett dictionary
             //Server ska vara ett dictionary
@@ -53,7 +55,7 @@ namespace PasswordManager
 
 
 
-            string vaultKey = makeVaultKey(masterPassword, secretKey);
+            byte[] vaultKey = makeVaultKey(masterPassword, secretKey); //lagra vault key som sträng men använd som byte array vid kryptering
 
             Console.WriteLine(vaultKey);
 
@@ -63,6 +65,10 @@ namespace PasswordManager
             {
                 Console.WriteLine($"{kvp.Key}: {kvp.Value}");
             }*/
+
+            AesClass aes = new AesClass(vaultKey);
+            Console.WriteLine("Hej");
+
         }
 
 
@@ -80,7 +86,7 @@ namespace PasswordManager
             //OVAN TAGET FRÅN https://learn.microsoft.com/mt-mt/dotnet/api/system.security.cryptography.randomnumbergenerator.getbytes?view=netcore-2.2
         }
 
-        static string makeVaultKey(string mstrpwd, string scrtkey)
+        static byte[] makeVaultKey(string mstrpwd, string scrtkey)
         {
             byte[] salt = GenerateByteArray(8);
 
@@ -100,11 +106,10 @@ namespace PasswordManager
             encrypt.Write(utfD1, 0, utfD1.Length);
             encrypt.FlushFinalBlock();
             encrypt.Close();
-            byte[] edata1 = encryptionStream.ToArray();
+            byte[] vaultKey = encryptionStream.ToArray(); //HÄR BLIR DET 48 BYTES
             k1.Reset();
             
-            string createdVaultKey = Convert.ToBase64String(edata1);
-            return createdVaultKey;
+            return vaultKey;
 
 
             // DECRYPT
@@ -127,7 +132,5 @@ namespace PasswordManager
             vault[applikation] = pswrd;
             return vault;
         }
-
-
     }
 }
