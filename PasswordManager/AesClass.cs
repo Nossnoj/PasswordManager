@@ -10,33 +10,42 @@ namespace PasswordManager
     internal class AesClass
     {
         private byte[] vaultKey { get; set; }
+
+        public byte[] IV;
+
+        public byte[] encryptedVault;
+
+        private string Vault { get; set; }
         
-        public AesClass(byte[] vaultKey)
+        public AesClass(string Vault, byte[] vaultKey)
         {
+            this.Vault = Vault;
             this.vaultKey = vaultKey;
             Start();
         }
         
         public void Start()
         {
-            string dataIn = "Nånting nånting";
-
             using(Aes myAes = Aes.Create())
             {
-                byte[] encrypted = AESEncrypt(dataIn, vaultKey, myAes.IV);
+                IV = myAes.IV;
+                byte[] encrypted = AESEncrypt(Vault, vaultKey, IV);
+                encryptedVault = encrypted;
 
-                string roundtrip = AESDecrypt(encrypted, vaultKey, myAes.IV);
+                string roundtrip = AESDecrypt(encrypted, vaultKey, IV);
+
+                
             }        
         }
 
-        static byte[] AESEncrypt(string dataIn, byte[] key, byte[] IV)
+        static byte[] AESEncrypt(string Vault, byte[] key, byte[] IV)
         {
             byte[] encrypted;
             
             using(Aes aesAlg = Aes.Create())
             {
-                aesAlg.Key = key; //vill ha 32 bytes men får just nu 48 bytes
-                aesAlg.IV = IV;
+                aesAlg.Key = key; //vad är syftet med denna raden?
+                aesAlg.IV = IV; //denna med?
 
                 ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
 
@@ -46,7 +55,7 @@ namespace PasswordManager
                     {
                         using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
                         {
-                            swEncrypt.Write(dataIn);
+                            swEncrypt.Write(Vault);
                         }
                     }
                     encrypted = msEncrypt.ToArray();

@@ -32,15 +32,11 @@ namespace PasswordManager
             secretDict["secret"] = secretKey;
             string dictJson = JsonSerializer.Serialize(secretDict);
 
-            File.WriteAllText(clientFile, dictJson);
-
-
-
-
+            File.WriteAllText(clientFile, dictJson); // HÄR SPARAS SECRET KEY INUTI CLIENT FILE
+            // Your secret key will be printed in plain-text to standard out" - spotta ut secret key i konsol?
 
             Dictionary<string, string> server = new Dictionary<string, string>();
 
-            File.WriteAllText(serverFile, "encryptedVault" + "IV"); //byteArray lagras encodad i base64string i serverfilen
             
             Console.WriteLine("STOP");
 
@@ -51,12 +47,21 @@ namespace PasswordManager
 
             Dictionary<string, string> vault = new Dictionary<string, string>();
             vault = addToVault(vault, "GOOGLE", "password");
+            string jsonVault = JsonSerializer.Serialize(vault);
 
-            AesClass aes = new AesClass(vaultKey);
+            AesClass aes = new AesClass(jsonVault, vaultKey);// Aes-objekt ska inte sparas, men vi måste spara vår IV för att kunna decrypta senare, Vault Key kan genereras på nytt genom Master Password + Secret Key
             Console.WriteLine("Hej");
+            string IV = Convert.ToBase64String(aes.IV);
+            string encryptedVault = Convert.ToBase64String(aes.encryptedVault);
+            server["vault"] = encryptedVault;
+            server["iv"] = IV;
+
+            string serverJson = JsonSerializer.Serialize(server);
+            
+            
+            File.WriteAllText(serverFile, serverJson); // Backe måste kolla på detta
 
         }
-
 
         static byte[] GenerateByteArray(int size)
         {
@@ -90,5 +95,23 @@ namespace PasswordManager
             vault[applikation] = pswrd;
             return vault;
         }
+
+
+        /* 
+        Lista med frågetecken:
+        * makeVaultKey metoden - måste vi encrypta den kombinerade master password och secret key eller räcker det med hashning?
+        * Lagrar vi encrypted vault och IV korrekt i Server filen?
+        * 
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         */
     }
 }
