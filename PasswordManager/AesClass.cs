@@ -4,50 +4,38 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
+using System.ComponentModel.DataAnnotations;
 
 namespace PasswordManager
 {
     internal class AesClass
     {
-        private byte[] vaultKey { get; set; }
+        private byte[] vaultKey;
 
-        public byte[] IV;
+        public byte[] IV { get; set; }
 
         public byte[] encryptedVault;
-
-        private string Vault { get; set; }
         
-        public AesClass(string Vault, byte[] vaultKey)
+        public AesClass(string unencryptedVault, byte[] vaultKey)
         {
-            this.Vault = Vault;
             this.vaultKey = vaultKey;
-            Start();
+            AESEncrypt(unencryptedVault);
+            AESDecrypt(encryptedVault, vaultKey, IV);
         }
         
-        public void Start()
-        {
-            using(Aes myAes = Aes.Create())
-            {
-                IV = myAes.IV;
-                byte[] encrypted = AESEncrypt(Vault, vaultKey, IV);
-                encryptedVault = encrypted;
+        //eventuellt att skapa ett AES-objekt i en egen metod.
 
-                string roundtrip = AESDecrypt(encrypted, vaultKey, IV);
-
-                
-            }        
-        }
-
-        static byte[] AESEncrypt(string Vault, byte[] key, byte[] IV)
+        private byte[] AESEncrypt(string unencryptedVault)
         {
             byte[] encrypted;
             
-            using(Aes aesAlg = Aes.Create())
+            using(Aes aes = Aes.Create())
             {
-                aesAlg.Key = key; //vad är syftet med denna raden?
-                aesAlg.IV = IV; //denna med?
+                aes.Key = vaultKey;
+                aes.GenerateIV();
+                IV = aes.IV;
 
-                ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
+                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
                 using (MemoryStream msEncrypt = new MemoryStream())
                 {
@@ -55,16 +43,17 @@ namespace PasswordManager
                     {
                         using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
                         {
-                            swEncrypt.Write(Vault);
+                            swEncrypt.Write(unencryptedVault);
                         }
                     }
                     encrypted = msEncrypt.ToArray();
                 }
             }
+            encryptedVault = encrypted;
             return encrypted;
         }
 
-        static string AESDecrypt(byte[] cipherText, byte[] Key, byte[] IV)
+        private string AESDecrypt(byte[] cipherText, byte[] Key, byte[] IV) //public static
         {
             string plaintext = null;
 
