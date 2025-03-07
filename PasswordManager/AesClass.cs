@@ -15,11 +15,20 @@ namespace PasswordManager
         public byte[] IV { get; set; }
 
         public byte[] encryptedVault;
+
+        public string decryptedVault;
+        
         
         public AesClass(string unencryptedVault, byte[] vaultKey)
         {
             this.vaultKey = vaultKey;
             AESEncrypt(unencryptedVault);
+            //AESDecrypt(encryptedVault, vaultKey, IV);      ---- inte automatiskt anrop till decrypt efter encrypt
+        }
+        public AesClass(byte[] encryptedVault, byte[] vaultKey, byte[] IV)
+        {
+            this.vaultKey = vaultKey;
+            this.IV = IV;
             AESDecrypt(encryptedVault, vaultKey, IV);
         }
         
@@ -53,7 +62,7 @@ namespace PasswordManager
             return encrypted;
         }
 
-        private string AESDecrypt(byte[] cipherText, byte[] Key, byte[] IV) //public static
+        public string AESDecrypt(byte[] cipherText, byte[] Key, byte[] IV) //public static
         {
             string plaintext = null;
 
@@ -70,11 +79,21 @@ namespace PasswordManager
                     {
                         using(StreamReader srDecrypt = new StreamReader(csDecrypt))
                         {
-                            plaintext = srDecrypt.ReadToEnd();
+                            try
+                            {
+                                plaintext = srDecrypt.ReadToEnd();
+                            }
+                            catch(Exception e)
+                            {
+                                Console.WriteLine("Fel lösenord");
+                                Console.ReadLine();
+                            }
+                            
                         }
                     }
                 }
             }
+            decryptedVault = plaintext;
             return plaintext;
         }
     }

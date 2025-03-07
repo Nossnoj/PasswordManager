@@ -25,9 +25,9 @@ namespace PasswordManager
             Console.Write("Skriv in ett lösenord: ");
             string masterPassword = Console.ReadLine();
             Console.WriteLine("Skriv client.json");
-            string clientPath = Console.ReadLine();
+            string clientPath = "client.json"; //Console.ReadLine();
             Console.WriteLine("Skriv server.json");
-            string serverPath = Console.ReadLine();
+            string serverPath = "server.json"; // Console.ReadLine();
 
 
             Console.WriteLine("Använd följande kommandon:");
@@ -40,19 +40,27 @@ namespace PasswordManager
             Console.WriteLine("    change           <client> <server> {<pwd>} {<new_pwd>}                 - Ändra huvudlösenord");
 
 
-            string command = Console.ReadLine();
+            string input = "hej";
+
+
+
+
+            string command = "init"; //Console.ReadLine();
             switch (command)
             {
                 case "init":
                     //init();
                     break;
-                case "create":
+                case "create": // ska inte kunna anropas utan att det redan finns en existerande server
                     //Create();
                     break;
                 case "get":
                     //Get();
                     break;
                 case "set":
+                    //Set();
+                    break;
+                case "set -g":
                     //Set();
                     break;
                 case "delete":
@@ -70,7 +78,8 @@ namespace PasswordManager
             //FILVÄGAR
             init(clientPath, serverPath, masterPassword);
 
-            attemptDecryptValve("password", "client.json");
+            //attemptDecryptVault("password", "client.json", "server.json");
+            Get(clientPath, serverPath, "", masterPassword);
 
             Console.WriteLine("STOP");
 
@@ -106,11 +115,17 @@ namespace PasswordManager
 
             //VAULT
             Dictionary<string, string> vault = new Dictionary<string, string>();
-            //vault = Set(vault, "GOOGLE", "password"); 
+            vault = Set(vault, "GOOGLE", "password");
+            vault = Set(vault, "FACEBOOK", "password2");
+            vault = Set(vault, "INSTAGRAM", "password3");
+            vault = Set(vault, "YOUTUBE", "password4");
+            vault = Set(vault, "NETFLIX", "password5");
+            vault = Set(vault, "nus@sarling.se", "nus123");
+            vault = Set(vault, "OKTAV", "password7");
             string jsonVault = JsonSerializer.Serialize(vault);
 
             // AES, KRYPTERING OCH LAGRING AV VAULT OCH IV I SERVER FIL
-            AesClass aes = new AesClass(jsonVault, vaultKey);
+            AesClass aes = new AesClass(jsonVault, vaultKey); // just nu både encryptar vi och decryptar
             string IV = Convert.ToBase64String(aes.IV);
             string encryptedVault = Convert.ToBase64String(aes.encryptedVault);
             server["vault"] = encryptedVault;
@@ -155,39 +170,113 @@ namespace PasswordManager
 
 
 
-        static void Create(string path)
+        static void Create(string clientPath, string serverPath) //användaren skriver in master pwd och secret key och sedan anropas attemptdecrypt
         {
             Console.Write("Ange din Secret Key: ");
             string secretKey = Console.ReadLine();
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string newClient = Path.Combine(desktopPath, path);
+            string newClient = Path.Combine(desktopPath, clientPath);
+
+            string server = Path.Combine(desktopPath, serverPath);
 
             Dictionary<string, string> secretDict = new Dictionary<string, string>();
-            secretDict["secret"] = secretKey;
+            secretDict["secret"] = secretKey; // varför dictionary?
 
+            Console.Write("Ange din Master Password: ");
+            string mstrpwd = Console.ReadLine();
+            
+            
+            byte[] scrtKeyByteArray = Convert.FromBase64String(secretKey);
+            byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
+
+            string serverBeforeDeserialize = File.ReadAllText(server);
+            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
+
+            var serverList = deserializeServer(server);
+            var IV = serverList[0];
+            var vault = serverList[1];
+
+            AesClass aes = new AesClass(vault, vk, IV);
         }
 
-        static void attemptDecryptValve(string mstrpwd, string clientPath)// kollar så att Value tillsammans med masterpassword dekryptar valvet. Används för alla metoder som kräver masterpassword
+
+
+
+        //används för alla som decryptar vault utom create
+        static string attemptDecryptVault(string mstrpwd, string clientPath, string serverPath)
         {
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop); //Kanske ha i projektmappen istället för på Desktop
             string clientFile = Path.Combine(desktopPath, clientPath);
-            string s = File.ReadAllText(clientFile);
-            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(s);
+            string serverFile = Path.Combine(desktopPath, serverPath);
+            string serializedClient = File.ReadAllText(clientFile);
+            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
             string scrtKey = secretDictionary["secret"];
             byte[] scrtKeyByteArray = Convert.FromBase64String(scrtKey);
+            string serializedServer = File.ReadAllText(serverFile);
+            Dictionary<string, string> serverDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedServer);
+
+
+            var serverList = deserializeServer(serverFile);
+            var IV = serverList[0];
+            var vault = serverList[1];
+
+            string fakePass = "linussarling";
 
             byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
-            //kolla så att Value tillsammans med masterpassword dekryptar valvet. Används för alla metoder som kräver masterpassword
-            //byte[] vk = makeVaultKey(mstrpwd, scrtkey);
+            
+            AesClass aes = new AesClass(vault, vk, IV);
+            string decryptedVault = aes.decryptedVault;
+            return decryptedVault;
+
         }
 
 
 
 
-        /*static string Get()
+        static List<byte[]> deserializeServer(string server)
         {
-            //gagtrhrh
-        }*/
+            var serverList = new List<byte[]>();
+            
+            
+            string serverBeforeDeserialize = File.ReadAllText(server);
+            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
+            string IV = serverDict["iv"];
+            byte[] IVByte = Convert.FromBase64String(IV);
+            string vault = serverDict["vault"];
+            byte[] vaultByte = Convert.FromBase64String(vault);
+
+            serverList.Add(IVByte);
+            serverList.Add(vaultByte);
+
+            return serverList;
+        }
+
+
+
+
+
+
+        static string Get(string clientPath, string serverPath, string prop, string mstrpwd)
+        {
+            string decryptedVault = attemptDecryptVault(mstrpwd, clientPath, serverPath);
+            var deserializeVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
+            //Om vi inte anger en prop, då ska Get lista ut alla props MEN inte deras tillhörande lösenord   
+            if (String.IsNullOrEmpty(prop))
+            {
+                foreach (var kvp in deserializeVault)
+                {
+                    Console.WriteLine(kvp.Key);
+                }
+                Console.ReadLine();
+            }
+
+
+            string retrievedPwd = deserializeVault[prop];
+
+
+            return retrievedPwd;      
+        }          
+
 
 
         static Dictionary<string, string> Set(Dictionary<string, string> vault, string applikation, string pswrd)
