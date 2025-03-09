@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualBasic;
 using System.Dynamic;
+using System.IO;
 using System.Linq.Expressions;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -14,20 +15,10 @@ namespace PasswordManager
         static void Main(string[] args)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            //attemptDecryptValve("password", "client.json");
-            /*Console.WriteLine("Användning: init <Client Path> <Server Path>");
-
-            string clientPath = args[0];
-            string serverPath = args[1];*/
             //Möjlig validering för att kontrollera att filerna faktikst döps till client och server
 
-            //MASTER PASSWORD
-            Console.Write("Skriv in ett lösenord: ");
-            string masterPassword = Console.ReadLine();
-            Console.WriteLine("Skriv client.json");
-            string clientPath = "client.json"; //Console.ReadLine();
-            Console.WriteLine("Skriv server.json");
-            string serverPath = "server.json"; // Console.ReadLine();
+
+
 
 
             Console.WriteLine("Använd följande kommandon:");
@@ -39,23 +30,20 @@ namespace PasswordManager
             Console.WriteLine("    secret           <client>                                              - Visa Secret Key");
             Console.WriteLine("    change           <client> <server> {<pwd>} {<new_pwd>}                 - Ändra huvudlösenord");
 
-
-            string input = "hej";
-
-
+            /*
+            string command = args[0];
 
 
-            string command = "init"; //Console.ReadLine();
-            switch (command)
+            switch (command.ToLower())
             {
                 case "init":
-                    //init();
+                    init(args[1], args[2], args[3]);
                     break;
-                case "create": // ska inte kunna anropas utan att det redan finns en existerande server
-                    //Create();
+                case "create": 
+                    Create(args[1], args[2]);
                     break;
                 case "get":
-                    //Get();
+                    Get(args[1], args[2], args[3], args[4]);
                     break;
                 case "set":
                     //Set();
@@ -72,40 +60,48 @@ namespace PasswordManager
                 case "change":
                     //Change();
                     break;
-            }
+            }*/
+
+            init("client.json", "server.json", "password");
+            Create("client2.json", "server.json");
+
+            Console.WriteLine();
 
 
-            //FILVÄGAR
-            init(clientPath, serverPath, masterPassword);
 
-            //attemptDecryptVault("password", "client.json", "server.json");
-            Get(clientPath, serverPath, "", masterPassword);
-
-            Console.WriteLine("STOP");
-
-
+            //skapat en getPath metod som automatiskt ger oss en färdig filväg där filerna ska lagras - just nu till desktop
+            //ändrat lite med args i main-metoden och korrigerat switch satsen
+            //liten ändring på create metoden med en conditional
+            //git fuckar
 
 
         }
 
-        static void init(string clientPath, string serverPath, string mstrpwd)
+        static string getPath(string file)
         {
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop); //Kanske ha i projektmappen istället för på Desktop
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string fullPath = Path.Combine(desktopPath, file);
+
+            return fullPath;
+        }
+
+        static void init(string clientName, string serverName, string mstrpwd)
+        {
 
 
             //CLIENT & SECRET KEY
-            string clientFile = Path.Combine(desktopPath, clientPath);
+            string clientPath = getPath(clientName);
             byte[] secretKeyByteArray = GenerateByteArray(16);
             string secretKey = Convert.ToBase64String(secretKeyByteArray);
             Dictionary<string, string> secretDict = new Dictionary<string, string>();
             secretDict["secret"] = secretKey;
             string dictJson = JsonSerializer.Serialize(secretDict);
-            File.WriteAllText(clientFile, dictJson); // HÄR SPARAS SECRET KEY INUTI CLIENT FILE
+            File.WriteAllText(clientPath, dictJson); // HÄR SPARAS SECRET KEY INUTI CLIENT FILE
                                                      // Your secret key will be printed in plain-text to standard out" - spotta ut secret key i konsol?
 
             //SERVER
             Dictionary<string, string> server = new Dictionary<string, string>();
-            string serverFile = Path.Combine(desktopPath, serverPath);
+            string serverPath = getPath(serverName);
 
 
             //VAULT KEY
@@ -131,7 +127,7 @@ namespace PasswordManager
             server["vault"] = encryptedVault;
             server["iv"] = IV;
             string serverJson = JsonSerializer.Serialize(server);
-            File.WriteAllText(serverFile, serverJson);
+            File.WriteAllText(serverPath, serverJson);
 
         }
 
@@ -172,51 +168,57 @@ namespace PasswordManager
 
         static void Create(string clientPath, string serverPath) //användaren skriver in master pwd och secret key och sedan anropas attemptdecrypt
         {
-            Console.Write("Ange din Secret Key: ");
-            string secretKey = Console.ReadLine();
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string newClient = Path.Combine(desktopPath, clientPath);
+            string server = getPath(serverPath);
+            if (File.Exists(server))
+            {
+                string newClient = getPath(clientPath);
 
-            string server = Path.Combine(desktopPath, serverPath);
+                Console.Write("Ange din Secret Key: ");
+                string secretKey = Console.ReadLine();
+                Dictionary<string, string> secretDict = new Dictionary<string, string>();
+                secretDict["secret"] = secretKey;
+                string dictJson = JsonSerializer.Serialize(secretDict);
 
-            Dictionary<string, string> secretDict = new Dictionary<string, string>();
-            secretDict["secret"] = secretKey; // varför dictionary?
+                Console.Write("Ange din Master Password: ");
+                string mstrpwd = Console.ReadLine();
 
-            Console.Write("Ange din Master Password: ");
-            string mstrpwd = Console.ReadLine();
-            
-            
-            byte[] scrtKeyByteArray = Convert.FromBase64String(secretKey);
-            byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
 
-            string serverBeforeDeserialize = File.ReadAllText(server);
-            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
+                byte[] scrtKeyByteArray = Convert.FromBase64String(secretKey);
+                byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
 
-            var serverList = deserializeServer(server);
-            var IV = serverList[0];
-            var vault = serverList[1];
+                string serverBeforeDeserialize = File.ReadAllText(server);
+                Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
 
-            AesClass aes = new AesClass(vault, vk, IV);
+                var serverList = deserializeServer(server);
+                var IV = serverList[0];
+                var vault = serverList[1];
+
+                AesClass aes = new AesClass(vault, vk, IV); // Detta funkar, men hur kan vi bevisa att den inte skickar ut skit?
+                File.WriteAllText(newClient, dictJson);
+            }
+            else
+            {
+                Console.WriteLine("Här ska något error vara"); /////////////////////////////////////////////////////////////
+            }
         }
 
 
 
 
         //används för alla som decryptar vault utom create
-        static string attemptDecryptVault(string mstrpwd, string clientPath, string serverPath)
+        static string attemptDecryptVault(string mstrpwd, string clientName, string serverName)
         {
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop); //Kanske ha i projektmappen istället för på Desktop
-            string clientFile = Path.Combine(desktopPath, clientPath);
-            string serverFile = Path.Combine(desktopPath, serverPath);
-            string serializedClient = File.ReadAllText(clientFile);
+            string clientPath = getPath(clientName);
+            string serverPath = getPath(serverName);
+            string serializedClient = File.ReadAllText(clientPath);
             Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
             string scrtKey = secretDictionary["secret"];
             byte[] scrtKeyByteArray = Convert.FromBase64String(scrtKey);
-            string serializedServer = File.ReadAllText(serverFile);
+            string serializedServer = File.ReadAllText(serverPath);
             Dictionary<string, string> serverDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedServer);
 
 
-            var serverList = deserializeServer(serverFile);
+            var serverList = deserializeServer(serverPath);
             var IV = serverList[0];
             var vault = serverList[1];
 
@@ -293,7 +295,8 @@ namespace PasswordManager
          
          
          
-         
+          
+
          
          
          */
