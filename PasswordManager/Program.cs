@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PasswordManager
 {
@@ -30,9 +31,13 @@ namespace PasswordManager
             Console.WriteLine("    secret           <client>                                              - Visa Secret Key");
             Console.WriteLine("    change           <client> <server> {<pwd>} {<new_pwd>}                 - Ändra huvudlösenord");
 
-            /*
-            string command = args[0];
 
+            //<arg> - mandatory argument
+            //[<arg>] - optional argument
+            //{<arg>} - argument is provided interactively through user input from Console.ReadLine
+            
+            /*string command = args[0];
+           
 
             switch (command.ToLower())
             {
@@ -43,12 +48,10 @@ namespace PasswordManager
                     Create(args[1], args[2]);
                     break;
                 case "get":
+                    if(args.Length > 3)
                     Get(args[1], args[2], args[3], args[4]);
                     break;
                 case "set":
-                    //Set();
-                    break;
-                case "set -g":
                     //Set();
                     break;
                 case "delete":
@@ -63,16 +66,11 @@ namespace PasswordManager
             }*/
 
             init("client.json", "server.json", "password");
-            Create("client2.json", "server.json");
+            //Create("client2.json", "server.json");
+            //Secret("client.json");
+            Delete("client.json", "server.json", "GOOGLE");
 
             Console.WriteLine();
-
-
-
-            //skapat en getPath metod som automatiskt ger oss en färdig filväg där filerna ska lagras - just nu till desktop
-            //ändrat lite med args i main-metoden och korrigerat switch satsen
-            //liten ändring på create metoden med en conditional
-            //git fuckar
 
 
         }
@@ -111,13 +109,13 @@ namespace PasswordManager
 
             //VAULT
             Dictionary<string, string> vault = new Dictionary<string, string>();
-            vault = Set(vault, "GOOGLE", "password");
-            vault = Set(vault, "FACEBOOK", "password2");
-            vault = Set(vault, "INSTAGRAM", "password3");
-            vault = Set(vault, "YOUTUBE", "password4");
-            vault = Set(vault, "NETFLIX", "password5");
-            vault = Set(vault, "nus@sarling.se", "nus123");
-            vault = Set(vault, "OKTAV", "password7");
+            vault = fakeSet(vault, "GOOGLE", "password");
+            vault = fakeSet(vault, "FACEBOOK", "password2");
+            vault = fakeSet(vault, "INSTAGRAM", "password3");
+            vault = fakeSet(vault, "YOUTUBE", "password4");
+            vault = fakeSet(vault, "NETFLIX", "password5");
+            vault = fakeSet(vault, "nus@sarling.se", "nus123");
+            vault = fakeSet(vault, "OKTAV", "password7");
             string jsonVault = JsonSerializer.Serialize(vault);
 
             // AES, KRYPTERING OCH LAGRING AV VAULT OCH IV I SERVER FIL
@@ -217,12 +215,9 @@ namespace PasswordManager
             string serializedServer = File.ReadAllText(serverPath);
             Dictionary<string, string> serverDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedServer);
 
-
             var serverList = deserializeServer(serverPath);
             var IV = serverList[0];
             var vault = serverList[1];
-
-            string fakePass = "linussarling";
 
             byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
             
@@ -261,11 +256,12 @@ namespace PasswordManager
         static string Get(string clientPath, string serverPath, string prop, string mstrpwd)
         {
             string decryptedVault = attemptDecryptVault(mstrpwd, clientPath, serverPath);
-            var deserializeVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
+            var deserializedVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
             //Om vi inte anger en prop, då ska Get lista ut alla props MEN inte deras tillhörande lösenord   
+            //mstrpwd ska frågas efter i denna metod, vi ska inte ta in den i argumenten. 
             if (String.IsNullOrEmpty(prop))
             {
-                foreach (var kvp in deserializeVault)
+                foreach (var kvp in deserializedVault)
                 {
                     Console.WriteLine(kvp.Key);
                 }
@@ -273,30 +269,88 @@ namespace PasswordManager
             }
 
 
-            string retrievedPwd = deserializeVault[prop];
+            string retrievedPwd = deserializedVault[prop];
 
 
             return retrievedPwd;      
-        }          
+        }
 
-
-
-        static Dictionary<string, string> Set(Dictionary<string, string> vault, string applikation, string pswrd)
+        static Dictionary<string, string> fakeSet(Dictionary<string, string> vault, string applikation, string pswrd) //DENNA SKA BORT
         {
             vault[applikation] = pswrd;
             return vault;
         }
 
 
-        /* 
-        Lista med frågetecken:
-         
-         
-         
-         
-         
+        /*static Dictionary<string, string> Set(string clientPath, string serverPath, string prop, string g)
+        {
+            vault[applikation] = pswrd;
+            return vault;
+        }*/
+
+
+        static void Delete(string clientPath, string serverPath, string prop)
+        {
+            Console.WriteLine("Enter your master password:");
+            string password = Console.ReadLine();
+
+            string serverName = getPath(serverPath);
+            string client = getPath(clientPath);
           
 
+            string decryptedVault = attemptDecryptVault(password, clientPath, serverPath);
+
+            string serializedClient = File.ReadAllText(client);
+            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
+            string scrtKey = secretDictionary["secret"];
+            byte[] secretKeyByte = Convert.FromBase64String(scrtKey);
+            
+            byte[] vk =  makeVaultKey(password, secretKeyByte);
+            
+            var deserializedVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
+
+            deserializedVault.Remove(prop);
+            string jsonVault = JsonSerializer.Serialize(deserializedVault);
+            AesClass Aes = new AesClass(jsonVault, vk);
+
+            string encryptedVault = Convert.ToBase64String(Aes.encryptedVault);
+            string IV = Convert.ToBase64String(Aes.IV);
+            
+            Dictionary<string, string> server = new Dictionary<string, string>();
+
+
+            server["vault"] = encryptedVault;
+            server["iv"] = IV;
+
+            string serializedServer = JsonSerializer.Serialize(server);
+
+            File.WriteAllText(serverName, serializedServer); 
+        }
+
+        static void Secret(string clientPath)
+        {
+            string client = getPath(clientPath);
+            string serializedClient = File.ReadAllText(client);
+            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
+            string scrtKey = secretDictionary["secret"];
+            Console.WriteLine(scrtKey);
+        }
+
+        static void Change(string client, string server, string oldPwd, string newPwd)
+        {
+            Console.WriteLine("Changes the master password for the vault located in server");
+
+        }
+
+
+
+        /* 
+        Lista med frågetecken:
+         gör switch-sats till en metod så att den kan kalla på sig själv efter ett kommando
+         change, en idé är att använder sig av init, och på något sätt sparar undan valvet och skickar in det. 
+         get argument!      
+        
+         
          
          
          */
