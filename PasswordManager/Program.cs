@@ -48,8 +48,10 @@ namespace PasswordManager
                     Create(args[1], args[2]);
                     break;
                 case "get":
-                    if(args.Length > 3)
-                    Get(args[1], args[2], args[3], args[4]);
+                    if (args.Length < 4) // temporär ful lösning
+                        Get(args[1], args[2], null);
+                    else
+                        Get(args[1], args[2], args[3]);
                     break;
                 case "set":
                     //Set();
@@ -68,7 +70,14 @@ namespace PasswordManager
             init("client.json", "server.json", "password");
             //Create("client2.json", "server.json");
             //Secret("client.json");
-            Delete("client.json", "server.json", "GOOGLE");
+            //Delete("client.json", "server.json", "GOOGLE");
+            //Get("client.json", "server.json", "facebook");
+
+
+
+            //Get("server.json", "client.json", "facebook");
+
+            Set("client.json", "server.json", "facebook", "g");
 
             Console.WriteLine();
 
@@ -78,15 +87,98 @@ namespace PasswordManager
         static string getPath(string file)
         {
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            //string desktopPath = Directory.GetCurrentDirectory(); //hamnar i bin -> debug -> net8.0 mapp
             string fullPath = Path.Combine(desktopPath, file);
 
             return fullPath;
         }
 
+        static byte[] GenerateByteArray(int size)
+        {
+            byte[] byteArray = new byte[size];
+
+            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(byteArray);
+            }
+
+            return byteArray;
+
+            //OVAN TAGET FRÅN https://learn.microsoft.com/mt-mt/dotnet/api/system.security.cryptography.randomnumbergenerator.getbytes?view=netcore-2.2
+        }
+
+        static byte[] makeVaultKey(string mstrpwd, byte[] scrtkey)
+        {
+            Rfc2898DeriveBytes vk = new Rfc2898DeriveBytes(mstrpwd, scrtkey, 1000, HashAlgorithmName.SHA256); //SHA256 eller annan variant?
+            {
+                return vk.GetBytes(32);
+            }
+        }
+
+        static byte[] retrieveScrtKey(string client)
+        {
+            string serializedClient = File.ReadAllText(client);
+            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
+            string scrtKey = secretDictionary["secret"];
+            byte[] scrtKeyByteArray = Convert.FromBase64String(scrtKey);
+            return scrtKeyByteArray;
+        }
+
+        //används för alla som decryptar vault utom create
+        static string attemptDecryptVault(string mstrpwd, string clientPath, string serverPath)
+        {
+            byte[] scrtKeyByteArray = retrieveScrtKey(clientPath);
+            string serializedServer = File.ReadAllText(serverPath);
+            Dictionary<string, string> serverDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedServer);
+
+            var serverList = deserializeServer(serverPath);
+            var IV = serverList[0];
+            var vault = serverList[1];
+
+            byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
+
+            AesClass aes = new AesClass(vault, vk, IV);
+            string decryptedVault = aes.decryptedVault;
+            return decryptedVault;
+        }
+
+        static List<byte[]> deserializeServer(string server)
+        {
+            var serverList = new List<byte[]>();
+
+            string serverBeforeDeserialize = File.ReadAllText(server);
+            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
+            string IV = serverDict["iv"];
+            byte[] IVByte = Convert.FromBase64String(IV);
+            string vault = serverDict["vault"];
+            byte[] vaultByte = Convert.FromBase64String(vault);
+
+            serverList.Add(IVByte);
+            serverList.Add(vaultByte);
+
+            return serverList;
+        }
+
+        static string generatePassword()
+        {
+            string validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+            int length = 20;
+
+            StringBuilder password = new StringBuilder();
+            Random random = new Random();
+
+            for (int i = 0; i < length; i++)
+            {
+                int index = random.Next(validChars.Length);
+                password.Append(validChars[index]);
+            }
+
+            return password.ToString();
+        }
+
         static void init(string clientName, string serverName, string mstrpwd)
         {
-
-
             //CLIENT & SECRET KEY
             string clientPath = getPath(clientName);
             byte[] secretKeyByteArray = GenerateByteArray(16);
@@ -109,13 +201,13 @@ namespace PasswordManager
 
             //VAULT
             Dictionary<string, string> vault = new Dictionary<string, string>();
-            vault = fakeSet(vault, "GOOGLE", "password");
-            vault = fakeSet(vault, "FACEBOOK", "password2");
-            vault = fakeSet(vault, "INSTAGRAM", "password3");
-            vault = fakeSet(vault, "YOUTUBE", "password4");
-            vault = fakeSet(vault, "NETFLIX", "password5");
+            vault = fakeSet(vault, "google", "password");
+            vault = fakeSet(vault, "facebook", "password2");
+            vault = fakeSet(vault, "instagram", "password3");
+            vault = fakeSet(vault, "youtube", "password4");
+            vault = fakeSet(vault, "netflix", "password5");
             vault = fakeSet(vault, "nus@sarling.se", "nus123");
-            vault = fakeSet(vault, "OKTAV", "password7");
+            vault = fakeSet(vault, "oktav", "password7");
             string jsonVault = JsonSerializer.Serialize(vault);
 
             // AES, KRYPTERING OCH LAGRING AV VAULT OCH IV I SERVER FIL
@@ -133,129 +225,54 @@ namespace PasswordManager
 
 
 
-
-        static byte[] GenerateByteArray(int size)
-        {
-            byte[] byteArray = new byte[size];
-
-            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(byteArray);
-            }
-
-            return byteArray;
-
-            //OVAN TAGET FRÅN https://learn.microsoft.com/mt-mt/dotnet/api/system.security.cryptography.randomnumbergenerator.getbytes?view=netcore-2.2
-        }
-
-
-
-
-
-
-        static byte[] makeVaultKey(string mstrpwd, byte[] scrtkey)
-        {
-            Rfc2898DeriveBytes vk = new Rfc2898DeriveBytes(mstrpwd, scrtkey, 1000, HashAlgorithmName.SHA256); //SHA256 eller annan variant?
-            {
-                return vk.GetBytes(32);
-            }
-        }
-
-
-
-
-        static void Create(string clientPath, string serverPath) //användaren skriver in master pwd och secret key och sedan anropas attemptdecrypt
+        static void Create(string clientPath, string serverPath) 
         {
             string server = getPath(serverPath);
-            if (File.Exists(server))
+            if (!File.Exists(server))
             {
-                string newClient = getPath(clientPath);
-
-                Console.Write("Ange din Secret Key: ");
-                string secretKey = Console.ReadLine();
-                Dictionary<string, string> secretDict = new Dictionary<string, string>();
-                secretDict["secret"] = secretKey;
-                string dictJson = JsonSerializer.Serialize(secretDict);
-
-                Console.Write("Ange din Master Password: ");
-                string mstrpwd = Console.ReadLine();
-
-
-                byte[] scrtKeyByteArray = Convert.FromBase64String(secretKey);
-                byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
-
-                string serverBeforeDeserialize = File.ReadAllText(server);
-                Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
-
-                var serverList = deserializeServer(server);
-                var IV = serverList[0];
-                var vault = serverList[1];
-
-                AesClass aes = new AesClass(vault, vk, IV); // Detta funkar, men hur kan vi bevisa att den inte skickar ut skit?
-                File.WriteAllText(newClient, dictJson);
+                Console.WriteLine("SERVERN FINNS INTE SÅ MAN KAN INTE SKAPA EN NY KLIENT DÅ"); // ERROR HÄR ----------------------------------------
             }
-            else
-            {
-                Console.WriteLine("Här ska något error vara"); /////////////////////////////////////////////////////////////
-            }
-        }
+
+            string newClient = getPath(clientPath);
+
+            Console.Write("Ange din Secret Key: ");
+            string secretKey = Console.ReadLine();
+            Dictionary<string, string> secretDict = new Dictionary<string, string>();
+            secretDict["secret"] = secretKey;
+            string dictJson = JsonSerializer.Serialize(secretDict);
+
+            Console.Write("Ange din Master Password: ");
+            string mstrpwd = Console.ReadLine();
 
 
+            byte[] scrtKeyByteArray = Convert.FromBase64String(secretKey);
+            byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
 
+            string serverBeforeDeserialize = File.ReadAllText(server);
+            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
 
-        //används för alla som decryptar vault utom create
-        static string attemptDecryptVault(string mstrpwd, string clientName, string serverName)
-        {
-            string clientPath = getPath(clientName);
-            string serverPath = getPath(serverName);
-            string serializedClient = File.ReadAllText(clientPath);
-            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
-            string scrtKey = secretDictionary["secret"];
-            byte[] scrtKeyByteArray = Convert.FromBase64String(scrtKey);
-            string serializedServer = File.ReadAllText(serverPath);
-            Dictionary<string, string> serverDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedServer);
-
-            var serverList = deserializeServer(serverPath);
+            var serverList = deserializeServer(server);
             var IV = serverList[0];
             var vault = serverList[1];
 
-            byte[] vk = makeVaultKey(mstrpwd, scrtKeyByteArray);
-            
-            AesClass aes = new AesClass(vault, vk, IV);
-            string decryptedVault = aes.decryptedVault;
-            return decryptedVault;
+            AesClass aes = new AesClass(vault, vk, IV); // Detta funkar, men hur kan vi bevisa att den inte skickar ut skit?
+            File.WriteAllText(newClient, dictJson);
 
         }
 
 
-
-
-        static List<byte[]> deserializeServer(string server)
+        static string Get(string clientPath, string serverPath, string prop) //behöver vi returnera 
         {
-            var serverList = new List<byte[]>();
+            string fullClientPath = getPath(clientPath);
+            string fullServerPath = getPath(serverPath);
             
-            
-            string serverBeforeDeserialize = File.ReadAllText(server);
-            Dictionary<string, string> serverDict = JsonSerializer.Deserialize<Dictionary<string, string>>(serverBeforeDeserialize);
-            string IV = serverDict["iv"];
-            byte[] IVByte = Convert.FromBase64String(IV);
-            string vault = serverDict["vault"];
-            byte[] vaultByte = Convert.FromBase64String(vault);
+            if(!File.Exists(fullClientPath) && !File.Exists(fullServerPath)){
+                Console.WriteLine("Fel klient eller server");
+            }
 
-            serverList.Add(IVByte);
-            serverList.Add(vaultByte);
-
-            return serverList;
-        }
-
-
-
-
-
-
-        static string Get(string clientPath, string serverPath, string prop, string mstrpwd)
-        {
-            string decryptedVault = attemptDecryptVault(mstrpwd, clientPath, serverPath);
+            Console.Write("Ange ditt lösenord: ");
+            string mstrpwd = Console.ReadLine();
+            string decryptedVault = attemptDecryptVault(mstrpwd, fullClientPath, fullServerPath);
             var deserializedVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
             //Om vi inte anger en prop, då ska Get lista ut alla props MEN inte deras tillhörande lösenord   
             //mstrpwd ska frågas efter i denna metod, vi ska inte ta in den i argumenten. 
@@ -268,11 +285,15 @@ namespace PasswordManager
                 Console.ReadLine();
             }
 
-
+            if (!deserializedVault.ContainsKey(prop))
+            {
+                Console.WriteLine(""); // om prop inte existerar så ska inget skrivas ut. denna koll behövs för annars kastas ett exception på grund av att prop inte finns i dictionary
+                Console.ReadLine(); // denna behöver dock fixas till lite
+            }
             string retrievedPwd = deserializedVault[prop];
 
-
-            return retrievedPwd;      
+            Console.WriteLine(retrievedPwd);
+            return retrievedPwd;   // nödvändigt?
         }
 
         static Dictionary<string, string> fakeSet(Dictionary<string, string> vault, string applikation, string pswrd) //DENNA SKA BORT
@@ -282,15 +303,63 @@ namespace PasswordManager
         }
 
 
-        /*static Dictionary<string, string> Set(string clientPath, string serverPath, string prop, string g)
+        static void Set(string clientPath, string serverPath, string prop, string g) //return Dictionary string string innan
         {
-            vault[applikation] = pswrd;
-            return vault;
-        }*/
+            string newPwd;
+            string mstrPwd = "";
+            
+            if (!String.IsNullOrEmpty(g))
+            {
+                newPwd = generatePassword();
+                Console.Write("Ange ditt Master Password: ");
+                mstrPwd = Console.ReadLine();
+            }
+            else
+            {
+                Console.Write("Ange det lösenordet du vill spara till " + prop + ": ");
+                newPwd = Console.ReadLine();
+                Console.Write("Ange ditt Master Password: "); 
+                mstrPwd = Console.ReadLine();
+            }
+
+            string fullClientPath = getPath(clientPath);
+            string fullServerPath = getPath(serverPath);
+
+            string decryptedVault = attemptDecryptVault(mstrPwd, fullClientPath, fullServerPath); 
+            var deserializedVault = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedVault);
+            deserializedVault[prop] = newPwd;
+
+            byte[] scrtKeyByteArray = retrieveScrtKey(fullClientPath);
+
+            byte[] vk = makeVaultKey(mstrPwd, scrtKeyByteArray);
+
+            string jsonVault = JsonSerializer.Serialize(deserializedVault);
+            AesClass Aes = new AesClass(jsonVault, vk);
+
+            string encryptedVault = Convert.ToBase64String(Aes.encryptedVault);
+            string IV = Convert.ToBase64String(Aes.IV);
+
+            Dictionary<string, string> server = new Dictionary<string, string>();
+
+
+            server["vault"] = encryptedVault;
+            server["iv"] = IV;
+
+            string serializedServer = JsonSerializer.Serialize(server);
+
+            File.WriteAllText(fullServerPath, serializedServer);
+        }
 
 
         static void Delete(string clientPath, string serverPath, string prop)
         {
+            string fullClientPath = getPath(clientPath);
+            string fullServerPath = getPath(serverPath);
+            if(!File.Exists(fullClientPath) && !File.Exists(fullServerPath))
+            {
+                Console.WriteLine("CLIENT ELLER SERVER EXISTERAR INTE"); // SKA VARA ETT FEL HÄR SEN, SAMT KAN MED LÄGGA TILL MER SPECIFIKA FEL TYP OM CLIENT FINNS MEN INTE SERVER OCH VICE VERSA
+            }
+
             Console.WriteLine("Enter your master password:");
             string password = Console.ReadLine();
 
@@ -298,12 +367,9 @@ namespace PasswordManager
             string client = getPath(clientPath);
           
 
-            string decryptedVault = attemptDecryptVault(password, clientPath, serverPath);
+            string decryptedVault = attemptDecryptVault(password, fullClientPath, fullServerPath);
 
-            string serializedClient = File.ReadAllText(client);
-            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
-            string scrtKey = secretDictionary["secret"];
-            byte[] secretKeyByte = Convert.FromBase64String(scrtKey);
+            byte[] secretKeyByte = retrieveScrtKey(fullClientPath);
             
             byte[] vk =  makeVaultKey(password, secretKeyByte);
             
@@ -330,9 +396,11 @@ namespace PasswordManager
         static void Secret(string clientPath)
         {
             string client = getPath(clientPath);
-            string serializedClient = File.ReadAllText(client);
-            Dictionary<string, string> secretDictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedClient);
-            string scrtKey = secretDictionary["secret"];
+            if (!File.Exists(client))
+            {
+                Console.WriteLine("Finns ingen client"); // NÅGON ERROR HÄR
+            }
+            string scrtKey = Convert.ToBase64String(retrieveScrtKey(client));
             Console.WriteLine(scrtKey);
         }
 
@@ -348,11 +416,16 @@ namespace PasswordManager
         Lista med frågetecken:
          gör switch-sats till en metod så att den kan kalla på sig själv efter ett kommando
          change, en idé är att använder sig av init, och på något sätt sparar undan valvet och skickar in det. 
-         get argument!      
+         get argument!   
+
         
          
-         
-         
+         * Om prop i Set är tomt
+         * Fixat temp lösning på hur vi skickar null till Get
+         * Påbörjat Set metod
+         * Fixat generatePassword metod
+         * Nog fixat klart Get
+         * fixat en retrieveScrtKey metod för att få bort en massa duplicerad kod
          */
     }
 }
